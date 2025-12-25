@@ -7,11 +7,14 @@ import (
 )
 
 type ModelHealthHourlyStat struct {
-	ModelName     string  `json:"model_name"`
-	HourStartTs   int64   `json:"hour_start_ts"`
-	SuccessSlices int64   `json:"success_slices"`
-	TotalSlices   int64   `json:"total_slices"`
-	SuccessRate   float64 `json:"success_rate"`
+	ModelName       string  `json:"model_name"`
+	HourStartTs     int64   `json:"hour_start_ts"`
+	SuccessSlices   int64   `json:"success_slices"`
+	TotalSlices     int64   `json:"total_slices"`
+	SuccessRate     float64 `json:"success_rate"`
+	TotalRequests   int64   `json:"total_requests"`
+	ErrorRequests   int64   `json:"error_requests"`
+	SuccessRequests int64   `json:"success_requests"`
 }
 
 func hourStartExprSQL(db *gorm.DB) string {
@@ -54,7 +57,10 @@ model_name as model_name,
 %s as hour_start_ts,
 SUM(has_success_qualified) as success_slices,
 COUNT(*) as total_slices,
-%s as success_rate`, hourStartExprSQL(db), successRateExprSQL())).
+%s as success_rate,
+SUM(total_requests) as total_requests,
+SUM(error_requests) as error_requests,
+SUM(total_requests) - SUM(error_requests) as success_requests`, hourStartExprSQL(db), successRateExprSQL())).
 		Where("model_name = ?", modelName).
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startHourTs, endHourTs).
 		Group("model_name, hour_start_ts").
@@ -81,7 +87,10 @@ model_name as model_name,
 %s as hour_start_ts,
 SUM(has_success_qualified) as success_slices,
 COUNT(*) as total_slices,
-%s as success_rate`, hourStartExprSQL(db), successRateExprSQL())).
+%s as success_rate,
+SUM(total_requests) as total_requests,
+SUM(error_requests) as error_requests,
+SUM(total_requests) - SUM(error_requests) as success_requests`, hourStartExprSQL(db), successRateExprSQL())).
 		Where("slice_start_ts >= ? AND slice_start_ts < ?", startHourTs, endHourTs).
 		Group("model_name, hour_start_ts").
 		Order("model_name ASC, hour_start_ts ASC").

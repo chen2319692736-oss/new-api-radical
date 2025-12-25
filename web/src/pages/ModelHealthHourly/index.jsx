@@ -18,8 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Form, Button, Spin, Table, Typography, Select, Avatar, Tooltip, DatePicker } from '@douyinfe/semi-ui';
-import { IconSearch, IconRefresh, IconTickCircle, IconAlertTriangle, IconClock, IconActivity } from '@douyinfe/semi-icons';
+import { Card, Button, Spin, Table, Typography, Select, Avatar, DatePicker } from '@douyinfe/semi-ui';
+import { IconSearch, IconTickCircle, IconAlertTriangle, IconClock, IconActivity } from '@douyinfe/semi-icons';
 import { VChart } from '@visactor/react-vchart';
 import { API, selectFilter, showError, timestamp2string } from '../../helpers';
 
@@ -31,6 +31,13 @@ function getDefaultHourRangeLast24h() {
   const nowSec = Math.floor(Date.now() / 1000);
   const endHour = floorToHour(nowSec) + 3600;
   const startHour = endHour - 24 * 3600;
+  return { startHour, endHour };
+}
+
+function getHourRange(hours) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const endHour = floorToHour(nowSec) + 3600;
+  const startHour = endHour - hours * 3600;
   return { startHour, endHour };
 }
 
@@ -48,19 +55,32 @@ function getRateLevel(rate) {
   return { level: 'critical', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', text: '严重' };
 }
 
-function StatCard({ icon, title, value, color, bgGradient }) {
+function StatCard({ icon, title, value, bgGradient }) {
   return (
     <div
-      className='relative overflow-hidden rounded-xl p-4'
+      className='relative overflow-hidden rounded-xl p-4 sm:p-5 min-h-[100px] flex flex-col justify-between shadow-md hover:shadow-lg transition-shadow duration-300'
       style={{ background: bgGradient }}
     >
-      <div className='flex items-center gap-3'>
-        <Avatar size='small' style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+      {/* 背景装饰 */}
+      <div
+        className='absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-20'
+        style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+      />
+      <div
+        className='absolute -right-3 -bottom-3 w-16 h-16 rounded-full opacity-15'
+        style={{ backgroundColor: 'rgba(255,255,255,0.4)' }}
+      />
+      
+      <div className='flex items-center gap-3 relative z-10'>
+        <div
+          className='w-10 h-10 rounded-xl flex items-center justify-center'
+          style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
+        >
           {icon}
-        </Avatar>
+        </div>
         <div>
-          <div className='text-xs opacity-80'>{title}</div>
-          <div className='text-xl font-bold'>{value}</div>
+          <div className='text-xs font-medium text-white/80'>{title}</div>
+          <div className='text-xl sm:text-2xl font-bold text-white'>{value}</div>
         </div>
       </div>
     </div>
@@ -87,12 +107,15 @@ export default function ModelHealthHourlyPage() {
   // 计算统计数据
   const stats = useMemo(() => {
     if (!Array.isArray(rows) || rows.length === 0) {
-      return { avgRate: 0, totalSuccess: 0, totalSlices: 0, minRate: 0, maxRate: 0 };
+      return { avgRate: 0, totalSuccess: 0, totalSlices: 0, minRate: 0, maxRate: 0, totalRequests: 0, errorRequests: 0, successRequests: 0 };
     }
     let totalSuccess = 0;
     let totalSlices = 0;
     let minRate = 1;
     let maxRate = 0;
+    let totalRequests = 0;
+    let errorRequests = 0;
+    let successRequests = 0;
 
     for (const r of rows) {
       totalSuccess += Number(r.success_slices) || 0;
@@ -100,10 +123,13 @@ export default function ModelHealthHourlyPage() {
       const rate = Number(r.success_rate) || 0;
       if (rate < minRate) minRate = rate;
       if (rate > maxRate) maxRate = rate;
+      totalRequests += Number(r.total_requests) || 0;
+      errorRequests += Number(r.error_requests) || 0;
+      successRequests += Number(r.success_requests) || 0;
     }
 
     const avgRate = totalSlices > 0 ? totalSuccess / totalSlices : 0;
-    return { avgRate, totalSuccess, totalSlices, minRate, maxRate };
+    return { avgRate, totalSuccess, totalSlices, minRate, maxRate, totalRequests, errorRequests, successRequests };
   }, [rows]);
 
 
@@ -114,6 +140,9 @@ export default function ModelHealthHourlyPage() {
       rate: Number(r.success_rate) || 0,
       success: Number(r.success_slices) || 0,
       total: Number(r.total_slices) || 0,
+      totalRequests: Number(r.total_requests) || 0,
+      errorRequests: Number(r.error_requests) || 0,
+      successRequests: Number(r.success_requests) || 0,
     }));
 
     return {
@@ -148,8 +177,20 @@ export default function ModelHealthHourlyPage() {
               value: (d) => formatRate(Number(d?.rate) || 0),
             },
             {
-              key: '成功/总计',
+              key: '成功/总计(时间片)',
               value: (d) => `${d?.success || 0}/${d?.total || 0}`,
+            },
+            {
+              key: '成功请求',
+              value: (d) => d?.successRequests || 0,
+            },
+            {
+              key: '失败请求',
+              value: (d) => d?.errorRequests || 0,
+            },
+            {
+              key: '总请求',
+              value: (d) => d?.totalRequests || 0,
             },
           ],
         },
@@ -197,7 +238,7 @@ export default function ModelHealthHourlyPage() {
         title: '时间',
         dataIndex: 'hour_start_ts',
         key: 'hour',
-        width: 180,
+        width: 160,
         render: (v) => (
           <div className='flex items-center gap-2'>
             <IconClock className='text-gray-400' size='small' />
@@ -206,28 +247,10 @@ export default function ModelHealthHourlyPage() {
         ),
       },
       {
-        title: '成功时间片',
-        dataIndex: 'success_slices',
-        key: 'success_slices',
-        width: 120,
-        render: (v) => (
-          <span className='font-medium text-green-600'>{v}</span>
-        ),
-      },
-      {
-        title: '总时间片',
-        dataIndex: 'total_slices',
-        key: 'total_slices',
-        width: 100,
-        render: (v) => (
-          <span className='font-medium'>{v}</span>
-        ),
-      },
-      {
         title: '成功率',
         dataIndex: 'success_rate',
         key: 'success_rate',
-        width: 150,
+        width: 130,
         render: (v) => {
           const rate = Number(v) || 0;
           const { color, bg, text } = getRateLevel(rate);
@@ -243,6 +266,44 @@ export default function ModelHealthHourlyPage() {
             </div>
           );
         },
+      },
+      {
+        title: '成功请求',
+        dataIndex: 'success_requests',
+        key: 'success_requests',
+        width: 100,
+        render: (v) => (
+          <span className='font-medium text-green-600'>{v || 0}</span>
+        ),
+      },
+      {
+        title: '失败请求',
+        dataIndex: 'error_requests',
+        key: 'error_requests',
+        width: 100,
+        render: (v) => (
+          <span className='font-medium text-red-500'>{v || 0}</span>
+        ),
+      },
+      {
+        title: '总请求',
+        dataIndex: 'total_requests',
+        key: 'total_requests',
+        width: 90,
+        render: (v) => (
+          <span className='font-medium'>{v || 0}</span>
+        ),
+      },
+      {
+        title: '时间片(成功/总)',
+        dataIndex: 'success_slices',
+        key: 'slices',
+        width: 120,
+        render: (v, record) => (
+          <span className='text-gray-500'>
+            {v || 0}/{record.total_slices || 0}
+          </span>
+        ),
       },
     ],
     [],
@@ -363,15 +424,15 @@ export default function ModelHealthHourlyPage() {
 
 
   return (
-    <div className='mt-[60px] px-2 sm:px-4 pb-8'>
+    <div className='mt-[60px] px-3 sm:px-6 lg:px-8 pb-10 max-w-[1800px] mx-auto'>
       {/* Header */}
-      <div className='mb-6'>
+      <div className='mb-8'>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
           <div>
-            <h1 className='text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent'>
+            <h1 className='text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 bg-clip-text text-transparent'>
               模型健康度分析
             </h1>
-            <p className='text-sm text-gray-500 mt-1'>
+            <p className='text-sm sm:text-base text-gray-500 mt-2'>
               按小时查看单个模型的健康度趋势
             </p>
           </div>
@@ -379,16 +440,16 @@ export default function ModelHealthHourlyPage() {
       </div>
 
       {/* Query Form */}
-      <Card className='!rounded-2xl mb-6' bodyStyle={{ padding: '20px 24px' }}>
+      <Card className='!rounded-2xl mb-8 shadow-sm' bodyStyle={{ padding: '24px 28px' }}>
         {(modelsError || rowsError) && (
-          <div className='mb-4 p-3 rounded-lg bg-red-50 border border-red-200'>
+          <div className='mb-5 p-4 rounded-xl bg-red-50 border border-red-200'>
             <Typography.Text type='danger'>{modelsError || rowsError}</Typography.Text>
           </div>
         )}
 
-        <div className='grid grid-cols-1 md:grid-cols-4 gap-4 items-end'>
+        <div className='grid grid-cols-1 md:grid-cols-4 gap-5 items-end'>
           <div>
-            <label className='block text-sm font-medium text-gray-600 mb-2'>选择模型</label>
+            <label className='block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2'>选择模型</label>
             <Select
               placeholder='选择或输入模型名称'
               optionList={modelOptions}
@@ -398,23 +459,23 @@ export default function ModelHealthHourlyPage() {
               allowCreate
               value={inputs.model_name}
               onChange={(v) => setInputs((prev) => ({ ...prev, model_name: v || '' }))}
-              style={{ width: '100%' }}
+              style={{ width: '100%', borderRadius: '10px' }}
               size='large'
             />
           </div>
 
           <div className='md:col-span-2'>
-            <label className='block text-sm font-medium text-gray-600 mb-2'>时间范围</label>
+            <label className='block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2'>时间范围</label>
             <DatePicker
               type='dateTimeRange'
               value={[new Date(inputs.start_hour * 1000), new Date(inputs.end_hour * 1000)]}
               onChange={handleDateRangeChange}
-              style={{ width: '100%' }}
+              style={{ width: '100%', borderRadius: '10px' }}
               size='large'
             />
           </div>
 
-          <div className='flex gap-2'>
+          <div className='flex gap-3'>
             <Button
               icon={<IconSearch />}
               type='primary'
@@ -424,71 +485,112 @@ export default function ModelHealthHourlyPage() {
               style={{
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 border: 'none',
+                borderRadius: '12px',
+                padding: '0 28px',
+                height: '44px',
               }}
             >
               查询
             </Button>
+          </div>
+        </div>
+
+        {/* 快捷时间按钮 */}
+        <div className='mt-5 flex flex-wrap gap-2 items-center'>
+          <span className='text-sm font-medium text-gray-500 mr-3'>快捷选择：</span>
+          {[
+            { label: '最近1小时', hours: 1 },
+            { label: '最近8小时', hours: 8 },
+            { label: '最近24小时', hours: 24 },
+            { label: '最近3天', hours: 72 },
+            { label: '最近7天', hours: 168 },
+          ].map((item) => (
             <Button
-              icon={<IconRefresh />}
+              key={item.hours}
+              size='small'
+              style={{ borderRadius: '8px' }}
               onClick={() => {
-                const r = getDefaultHourRangeLast24h();
+                const r = getHourRange(item.hours);
                 setInputs((prev) => ({ ...prev, start_hour: r.startHour, end_hour: r.endHour }));
               }}
-              size='large'
             >
-              最近24h
+              {item.label}
             </Button>
-          </div>
+          ))}
         </div>
       </Card>
 
       <Spin spinning={loading}>
         {/* Stats Cards */}
         {rows.length > 0 && (
-          <div className='grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6'>
-            <StatCard
-              icon={<IconActivity className='text-white' />}
-              title='平均成功率'
-              value={formatRate(stats.avgRate)}
-              color='#667eea'
-              bgGradient='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-            />
-            <StatCard
-              icon={<IconTickCircle className='text-white' />}
-              title='成功时间片'
-              value={stats.totalSuccess}
-              color='#22c55e'
-              bgGradient='linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-            />
-            <StatCard
-              icon={<IconClock className='text-white' />}
-              title='总时间片'
-              value={stats.totalSlices}
-              color='#3b82f6'
-              bgGradient='linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-            />
-            <StatCard
-              icon={<IconAlertTriangle className='text-white' />}
-              title='最低成功率'
-              value={formatRate(stats.minRate)}
-              color='#f59e0b'
-              bgGradient='linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-            />
-          </div>
+          <>
+            <div className='grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5'>
+              <StatCard
+                icon={<IconActivity className='text-white' size='large' />}
+                title='平均成功率'
+                value={formatRate(stats.avgRate)}
+                bgGradient='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+              />
+              <StatCard
+                icon={<IconTickCircle className='text-white' size='large' />}
+                title='成功请求'
+                value={stats.successRequests.toLocaleString()}
+                bgGradient='linear-gradient(135deg, #22c55e 0%, #15803d 100%)'
+              />
+              <StatCard
+                icon={<IconAlertTriangle className='text-white' size='large' />}
+                title='失败请求'
+                value={stats.errorRequests.toLocaleString()}
+                bgGradient='linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
+              />
+              <StatCard
+                icon={<IconClock className='text-white' size='large' />}
+                title='总请求'
+                value={stats.totalRequests.toLocaleString()}
+                bgGradient='linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+              />
+            </div>
+            <div className='grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8'>
+              <StatCard
+                icon={<IconTickCircle className='text-white' size='large' />}
+                title='成功时间片'
+                value={stats.totalSuccess}
+                bgGradient='linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)'
+              />
+              <StatCard
+                icon={<IconClock className='text-white' size='large' />}
+                title='总时间片'
+                value={stats.totalSlices}
+                bgGradient='linear-gradient(135deg, #6366f1 0%, #4338ca 100%)'
+              />
+              <StatCard
+                icon={<IconAlertTriangle className='text-white' size='large' />}
+                title='最低成功率'
+                value={formatRate(stats.minRate)}
+                bgGradient='linear-gradient(135deg, #f59e0b 0%, #b45309 100%)'
+              />
+              <StatCard
+                icon={<IconActivity className='text-white' size='large' />}
+                title='最高成功率'
+                value={formatRate(stats.maxRate)}
+                bgGradient='linear-gradient(135deg, #10b981 0%, #047857 100%)'
+              />
+            </div>
+          </>
         )}
 
         {/* Chart and Table */}
-        <div className='grid grid-cols-1 xl:grid-cols-2 gap-4'>
+        <div className='grid grid-cols-1 xl:grid-cols-2 gap-5'>
           {/* Chart */}
           <Card
-            className='!rounded-2xl'
+            className='!rounded-2xl shadow-sm'
             title={
-              <div className='flex items-center gap-2'>
-                <div className='w-1 h-5 rounded-full bg-gradient-to-b from-purple-500 to-blue-500' />
-                <span>成功率趋势</span>
+              <div className='flex items-center gap-3'>
+                <div className='w-1.5 h-6 rounded-full bg-gradient-to-b from-purple-500 to-blue-500' />
+                <span className='font-semibold text-base'>成功率趋势</span>
               </div>
             }
-            bodyStyle={{ padding: '16px' }}
+            bodyStyle={{ padding: '20px' }}
           >
             <div className='h-80'>
               {rows.length > 0 ? (
@@ -496,8 +598,8 @@ export default function ModelHealthHourlyPage() {
               ) : (
                 <div className='h-full flex items-center justify-center'>
                   <div className='text-center'>
-                    <div className='text-4xl mb-2'>📈</div>
-                    <Typography.Text type='tertiary'>暂无数据</Typography.Text>
+                    <div className='text-5xl mb-3'>📈</div>
+                    <Typography.Text type='tertiary' className='text-base'>暂无数据</Typography.Text>
                   </div>
                 </div>
               )}
@@ -506,11 +608,11 @@ export default function ModelHealthHourlyPage() {
 
           {/* Table */}
           <Card
-            className='!rounded-2xl'
+            className='!rounded-2xl shadow-sm'
             title={
-              <div className='flex items-center gap-2'>
-                <div className='w-1 h-5 rounded-full bg-gradient-to-b from-green-500 to-teal-500' />
-                <span>详细数据</span>
+              <div className='flex items-center gap-3'>
+                <div className='w-1.5 h-6 rounded-full bg-gradient-to-b from-green-500 to-teal-500' />
+                <span className='font-semibold text-base'>详细数据</span>
               </div>
             }
             bodyStyle={{ padding: 0 }}
@@ -525,9 +627,9 @@ export default function ModelHealthHourlyPage() {
               size='small'
               scroll={{ y: 300 }}
               empty={
-                <div className='py-8 text-center'>
-                  <div className='text-4xl mb-2'>📊</div>
-                  <Typography.Text type='tertiary'>
+                <div className='py-10 text-center'>
+                  <div className='text-5xl mb-3'>📊</div>
+                  <Typography.Text type='tertiary' className='text-base'>
                     {rowsError ? '数据加载异常' : '暂无数据'}
                   </Typography.Text>
                 </div>

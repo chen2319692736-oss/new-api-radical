@@ -32,19 +32,25 @@ type publicModelHealthCacheData struct {
 }
 
 type modelHealthHourlyRespItem struct {
-	ModelName     string  `json:"model_name"`
-	HourStartTs   int64   `json:"hour_start_ts"`
-	SuccessSlices int64   `json:"success_slices"`
-	TotalSlices   int64   `json:"total_slices"`
-	SuccessRate   float64 `json:"success_rate"`
+	ModelName       string  `json:"model_name"`
+	HourStartTs     int64   `json:"hour_start_ts"`
+	SuccessSlices   int64   `json:"success_slices"`
+	TotalSlices     int64   `json:"total_slices"`
+	SuccessRate     float64 `json:"success_rate"`
+	TotalRequests   int64   `json:"total_requests"`
+	ErrorRequests   int64   `json:"error_requests"`
+	SuccessRequests int64   `json:"success_requests"`
 }
 
 type publicModelsHealthHourlyLast24hRespItem struct {
-	ModelName     string  `json:"model_name"`
-	HourStartTs   int64   `json:"hour_start_ts"`
-	SuccessSlices int64   `json:"success_slices"`
-	TotalSlices   int64   `json:"total_slices"`
-	SuccessRate   float64 `json:"success_rate"`
+	ModelName       string  `json:"model_name"`
+	HourStartTs     int64   `json:"hour_start_ts"`
+	SuccessSlices   int64   `json:"success_slices"`
+	TotalSlices     int64   `json:"total_slices"`
+	SuccessRate     float64 `json:"success_rate"`
+	TotalRequests   int64   `json:"total_requests"`
+	ErrorRequests   int64   `json:"error_requests"`
+	SuccessRequests int64   `json:"success_requests"`
 }
 
 // GetModelHealthHourlyStatsAPI 查询模型在小时 bucket 上的健康度（success_slices/total_slices/success_rate）。
@@ -117,20 +123,26 @@ func GetModelHealthHourlyStatsAPI(c *gin.Context) {
 	for _, h := range wantHours {
 		if stat, ok := rowMap[h]; ok {
 			resp = append(resp, modelHealthHourlyRespItem{
-				ModelName:     stat.ModelName,
-				HourStartTs:   stat.HourStartTs,
-				SuccessSlices: stat.SuccessSlices,
-				TotalSlices:   stat.TotalSlices,
-				SuccessRate:   stat.SuccessRate,
+				ModelName:       stat.ModelName,
+				HourStartTs:     stat.HourStartTs,
+				SuccessSlices:   stat.SuccessSlices,
+				TotalSlices:     stat.TotalSlices,
+				SuccessRate:     stat.SuccessRate,
+				TotalRequests:   stat.TotalRequests,
+				ErrorRequests:   stat.ErrorRequests,
+				SuccessRequests: stat.SuccessRequests,
 			})
 			continue
 		}
 		resp = append(resp, modelHealthHourlyRespItem{
-			ModelName:     modelName,
-			HourStartTs:   h,
-			SuccessSlices: 0,
-			TotalSlices:   0,
-			SuccessRate:   0,
+			ModelName:       modelName,
+			HourStartTs:     h,
+			SuccessSlices:   0,
+			TotalSlices:     0,
+			SuccessRate:     0,
+			TotalRequests:   0,
+			ErrorRequests:   0,
+			SuccessRequests: 0,
 		})
 	}
 
@@ -182,20 +194,26 @@ func GetPublicModelsHealthHourlyLast24hAPI(c *gin.Context) {
 		for _, h := range wantHours {
 			if stat, ok := hourMap[h]; ok {
 				resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
-					ModelName:     stat.ModelName,
-					HourStartTs:   stat.HourStartTs,
-					SuccessSlices: stat.SuccessSlices,
-					TotalSlices:   stat.TotalSlices,
-					SuccessRate:   stat.SuccessRate,
+					ModelName:       stat.ModelName,
+					HourStartTs:     stat.HourStartTs,
+					SuccessSlices:   stat.SuccessSlices,
+					TotalSlices:     stat.TotalSlices,
+					SuccessRate:     stat.SuccessRate,
+					TotalRequests:   stat.TotalRequests,
+					ErrorRequests:   stat.ErrorRequests,
+					SuccessRequests: stat.SuccessRequests,
 				})
 				continue
 			}
 			resp = append(resp, publicModelsHealthHourlyLast24hRespItem{
-				ModelName:     modelName,
-				HourStartTs:   h,
-				SuccessSlices: 0,
-				TotalSlices:   0,
-				SuccessRate:   0,
+				ModelName:       modelName,
+				HourStartTs:     h,
+				SuccessSlices:   0,
+				TotalSlices:     0,
+				SuccessRate:     0,
+				TotalRequests:   0,
+				ErrorRequests:   0,
+				SuccessRequests: 0,
 			})
 		}
 	}
