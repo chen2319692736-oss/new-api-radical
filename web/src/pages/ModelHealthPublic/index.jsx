@@ -36,9 +36,9 @@ function getRateLevel(rate) {
   const v = Number(rate) || 0;
   if (v >= 0.95) return { level: 'excellent', color: '#4dd0e1', bg: 'rgba(77, 208, 225, 0.15)', text: '优秀' };
   if (v >= 0.8) return { level: 'good', color: '#66bb6a', bg: 'rgba(102, 187, 106, 0.15)', text: '良好' };
-  if (v >= 0.6) return { level: 'warning', color: '#aed581', bg: 'rgba(174, 213, 129, 0.15)', text: '警告' };
-  if (v >= 0.2) return { level: 'poor', color: '#ffb74d', bg: 'rgba(255, 183, 77, 0.15)', text: '较差' };
-  return { level: 'critical', color: '#ff8a65', bg: 'rgba(255, 138, 101, 0.15)', text: '严重' };
+  if (v >= 0.6) return { level: 'warning', color: '#aed581', bg: 'rgba(174, 213, 129, 0.15)', text: '一般' };
+  if (v >= 0.2) return { level: 'poor', color: '#ffb74d', bg: 'rgba(255, 183, 77, 0.15)', text: '欠佳' };
+  return { level: 'critical', color: '#ff8a65', bg: 'rgba(255, 138, 101, 0.15)', text: '异常' };
 }
 
 function HealthCell({ cell, isLatest }) {
@@ -362,9 +362,9 @@ export default function ModelHealthPublicPage() {
               <div className='flex flex-wrap items-center gap-2'>
                 <LegendItem color='#4dd0e1' label='优秀 (≥95%)' />
                 <LegendItem color='#66bb6a' label='良好 (80-95%)' />
-                <LegendItem color='#aed581' label='警告 (60-80%)' />
-                <LegendItem color='#ffb74d' label='较差 (20-60%)' />
-                <LegendItem color='#ff8a65' label='严重 (<20%)' />
+                <LegendItem color='#aed581' label='一般 (60-80%)' />
+                <LegendItem color='#ffb74d' label='欠佳 (20-60%)' />
+                <LegendItem color='#ff8a65' label='异常 (<20%)' />
               </div>
             </div>
             <Input
