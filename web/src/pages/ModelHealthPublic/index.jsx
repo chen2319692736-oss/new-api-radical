@@ -34,10 +34,10 @@ function hourLabel(tsSec) {
 
 function getRateLevel(rate) {
   const v = Number(rate) || 0;
-  if (v >= 0.99) return { level: 'excellent', color: '#4dd0e1', bg: 'rgba(77, 208, 225, 0.15)', text: '优秀' };
-  if (v >= 0.95) return { level: 'good', color: '#66bb6a', bg: 'rgba(102, 187, 106, 0.15)', text: '良好' };
-  if (v >= 0.8) return { level: 'warning', color: '#aed581', bg: 'rgba(174, 213, 129, 0.15)', text: '警告' };
-  if (v >= 0.5) return { level: 'poor', color: '#ffb74d', bg: 'rgba(255, 183, 77, 0.15)', text: '较差' };
+  if (v >= 0.95) return { level: 'excellent', color: '#4dd0e1', bg: 'rgba(77, 208, 225, 0.15)', text: '优秀' };
+  if (v >= 0.8) return { level: 'good', color: '#66bb6a', bg: 'rgba(102, 187, 106, 0.15)', text: '良好' };
+  if (v >= 0.6) return { level: 'warning', color: '#aed581', bg: 'rgba(174, 213, 129, 0.15)', text: '警告' };
+  if (v >= 0.2) return { level: 'poor', color: '#ffb74d', bg: 'rgba(255, 183, 77, 0.15)', text: '较差' };
   return { level: 'critical', color: '#ff8a65', bg: 'rgba(255, 138, 101, 0.15)', text: '严重' };
 }
 
@@ -360,11 +360,11 @@ export default function ModelHealthPublicPage() {
             <div className='flex flex-wrap items-center gap-3'>
               <span className='text-sm font-semibold text-gray-700 dark:text-gray-200 mr-2'>状态图例</span>
               <div className='flex flex-wrap items-center gap-2'>
-                <LegendItem color='#4dd0e1' label='优秀 (≥99%)' />
-                <LegendItem color='#66bb6a' label='良好 (95-99%)' />
-                <LegendItem color='#aed581' label='警告 (80-95%)' />
-                <LegendItem color='#ffb74d' label='较差 (50-80%)' />
-                <LegendItem color='#ff8a65' label='严重 (<50%)' />
+                <LegendItem color='#4dd0e1' label='优秀 (≥95%)' />
+                <LegendItem color='#66bb6a' label='良好 (80-95%)' />
+                <LegendItem color='#aed581' label='警告 (60-80%)' />
+                <LegendItem color='#ffb74d' label='较差 (20-60%)' />
+                <LegendItem color='#ff8a65' label='严重 (<20%)' />
               </div>
             </div>
             <Input
