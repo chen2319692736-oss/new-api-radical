@@ -332,10 +332,10 @@ export default function ModelHealthPublicPage() {
             iconBg='rgba(255,255,255,0.25)'
           />
           <StatCard
-            icon={<IconAlertTriangle className='text-white' size='large' />}
-            title='警告模型'
-            value={stats.warningModels}
-            subtitle='成功率 80-95%'
+            icon={<IconTickCircle className='text-white' size='large' />}
+            title='优良模型'
+            value={stats.healthyModels}
+            subtitle='成功率 ≥80%'
             color='#aed581'
             bgGradient='linear-gradient(135deg, #aed581 0%, #8fb86a 100%)'
             iconBg='rgba(255,255,255,0.25)'
