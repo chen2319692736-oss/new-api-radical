@@ -72,26 +72,36 @@ func GetActiveTaskSlotManager() *ActiveTaskSlotManager {
 	return activeTaskManager
 }
 
-// computeHashPrefixes 计算多级哈希前缀，返回哈希数组和最高层级索引
+// computeHashPrefixes 计算多级哈希前缀，只计算需要匹配的层级
+// 返回哈希数组和最高层级索引
 func computeHashPrefixes(data string) ([HashLevelCount][HashPrefixLen]byte, int) {
 	var result [HashLevelCount][HashPrefixLen]byte
 	dataLen := len(data)
-	maxLevelIdx := 0
 	
+	// 先确定最高层级
+	maxLevelIdx := 0
 	for i, level := range hashLevels {
-		// 取 data 的前 level 个字符（或全部）
+		if dataLen >= level {
+			maxLevelIdx = i
+		}
+	}
+	
+	// 只计算需要匹配的层级（从最高级往下 MatchLevelCount 级）
+	startLevel := maxLevelIdx - MatchLevelCount + 1
+	if startLevel < 0 {
+		startLevel = 0
+	}
+	
+	for i := startLevel; i <= maxLevelIdx; i++ {
+		level := hashLevels[i]
 		end := level
 		if end > dataLen {
 			end = dataLen
 		}
 		hash := sha256.Sum256([]byte(data[:end]))
 		copy(result[i][:], hash[:HashPrefixLen])
-		
-		// 记录数据长度能覆盖到的最高层级
-		if dataLen >= level {
-			maxLevelIdx = i
-		}
 	}
+	
 	return result, maxLevelIdx
 }
 
