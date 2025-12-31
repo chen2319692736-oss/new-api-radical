@@ -90,7 +90,7 @@ export default function FingerprintPage() {
     setLoading(true);
     try {
       const res = await API.get('/api/fingerprint/duplicates', {
-        params: { page, pageSize },
+        params: { p: page, page_size: pageSize },
       });
       const { success, data, message } = res.data;
       if (success) {
@@ -114,7 +114,7 @@ export default function FingerprintPage() {
         ? '/api/fingerprint/search'
         : '/api/fingerprint/';
       const res = await API.get(url, {
-        params: { page, pageSize, keyword },
+        params: { p: page, page_size: pageSize, keyword },
       });
       const { success, data, message } = res.data;
       if (success) {
@@ -135,7 +135,7 @@ export default function FingerprintPage() {
     setRelatedUsersLoading(true);
     try {
       const res = await API.get('/api/fingerprint/users', {
-        params: { visitor_id: visitorId, page: 1, pageSize: 100 },
+        params: { visitor_id: visitorId, p: 1, page_size: 100 },
       });
       const { success, data, message } = res.data;
       if (success) {
