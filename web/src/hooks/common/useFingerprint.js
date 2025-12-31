@@ -93,15 +93,20 @@ export const collectAndReportFingerprint = async (force = false) => {
   }
 };
 
-// React Hook
+// 登录成功时调用，强制上报指纹
+export const reportFingerprintOnLogin = () => {
+  collectAndReportFingerprint(true);
+};
+
+// React Hook - 用于定时上报（非强制）
 export const useFingerprint = (isLoggedIn = false) => {
   const hasInitialized = useRef(false);
 
   useEffect(() => {
     if (isLoggedIn && !hasInitialized.current) {
       hasInitialized.current = true;
-      // 登录时强制上报，确保每个账号都能记录指纹
-      collectAndReportFingerprint(true);
+      // 非强制模式，遵循1小时间隔
+      collectAndReportFingerprint(false);
     }
   }, [isLoggedIn]);
 };

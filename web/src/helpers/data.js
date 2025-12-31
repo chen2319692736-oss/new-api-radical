@@ -56,6 +56,10 @@ export function setStatusData(data) {
   }
 }
 
+import { reportFingerprintOnLogin } from '../hooks/common/useFingerprint';
+
 export function setUserData(data) {
   localStorage.setItem('user', JSON.stringify(data));
+  // 登录成功后上报指纹
+  reportFingerprintOnLogin();
 }
