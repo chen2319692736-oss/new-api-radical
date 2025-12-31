@@ -100,7 +100,8 @@ export const useFingerprint = (isLoggedIn = false) => {
   useEffect(() => {
     if (isLoggedIn && !hasInitialized.current) {
       hasInitialized.current = true;
-      collectAndReportFingerprint();
+      // 登录时强制上报，确保每个账号都能记录指纹
+      collectAndReportFingerprint(true);
     }
   }, [isLoggedIn]);
 };
