@@ -35,12 +35,16 @@ var hashLevels = []int{8, 64, 512, 4096, 32768, 131072}
 // HashLevelCount 哈希层级数量
 const HashLevelCount = 6
 
+// MatchLevelCount 匹配时使用的层级数量（从最高级往下）
+const MatchLevelCount = 2
+
 // TaskSlot 单个任务槽
 type TaskSlot struct {
-	UserID     int
-	Username   string
-	UpdatedAt  int64    // Unix 秒
-	HashPrefix [HashLevelCount][HashPrefixLen]byte // 6个层级的哈希前缀
+	UserID       int
+	Username     string
+	UpdatedAt    int64                                // Unix 秒
+	HashPrefix   [HashLevelCount][HashPrefixLen]byte  // 6个层级的哈希前缀
+	MaxLevelIdx  int                                  // 数据长度对应的最高层级索引
 }
 
 // ActiveTaskSlotManager 活跃任务槽管理器
@@ -68,24 +72,46 @@ func GetActiveTaskSlotManager() *ActiveTaskSlotManager {
 	return activeTaskManager
 }
 
-// computeHashPrefixes 计算多级哈希前缀
-func computeHashPrefixes(data string) [HashLevelCount][HashPrefixLen]byte {
+// computeHashPrefixes 计算多级哈希前缀，返回哈希数组和最高层级索引
+func computeHashPrefixes(data string) ([HashLevelCount][HashPrefixLen]byte, int) {
 	var result [HashLevelCount][HashPrefixLen]byte
+	dataLen := len(data)
+	maxLevelIdx := 0
+	
 	for i, level := range hashLevels {
 		// 取 data 的前 level 个字符（或全部）
 		end := level
-		if end > len(data) {
-			end = len(data)
+		if end > dataLen {
+			end = dataLen
 		}
 		hash := sha256.Sum256([]byte(data[:end]))
 		copy(result[i][:], hash[:HashPrefixLen])
+		
+		// 记录数据长度能覆盖到的最高层级
+		if dataLen >= level {
+			maxLevelIdx = i
+		}
 	}
-	return result
+	return result, maxLevelIdx
 }
 
 // matchHashPrefix 检查是否有任意一级哈希匹配
-func matchHashPrefix(a, b [HashLevelCount][HashPrefixLen]byte) bool {
-	for i := 0; i < HashLevelCount; i++ {
+// 只匹配从最高级往下 MatchLevelCount 个层级
+func matchHashPrefix(a, b [HashLevelCount][HashPrefixLen]byte, maxLevelIdxA, maxLevelIdxB int) bool {
+	// 取两者中较小的最高层级
+	maxLevel := maxLevelIdxA
+	if maxLevelIdxB < maxLevel {
+		maxLevel = maxLevelIdxB
+	}
+	
+	// 计算匹配范围：从 maxLevel 往下 MatchLevelCount 个层级
+	startLevel := maxLevel - MatchLevelCount + 1
+	if startLevel < 0 {
+		startLevel = 0
+	}
+	
+	// 只在这个范围内匹配
+	for i := startLevel; i <= maxLevel; i++ {
 		if bytes.Equal(a[i][:], b[i][:]) {
 			return true
 		}
@@ -100,16 +126,17 @@ func (m *ActiveTaskSlotManager) RecordTask(userID int, username string, data str
 	defer m.mu.Unlock()
 
 	now := time.Now().Unix()
-	hashPrefixes := computeHashPrefixes(data)
+	hashPrefixes, maxLevelIdx := computeHashPrefixes(data)
 
 	// 1. 在该用户的槽中查找可继承的槽
 	userSlots := m.userSlotIdx[userID]
 	for _, idx := range userSlots {
 		slot := m.slots[idx]
-		if matchHashPrefix(slot.HashPrefix, hashPrefixes) {
+		if matchHashPrefix(slot.HashPrefix, hashPrefixes, slot.MaxLevelIdx, maxLevelIdx) {
 			// 找到匹配，更新时间和哈希
 			slot.UpdatedAt = now
 			slot.HashPrefix = hashPrefixes
+			slot.MaxLevelIdx = maxLevelIdx
 			slot.Username = username
 			m.moveToLRUEnd(idx)
 			return
@@ -122,7 +149,7 @@ func (m *ActiveTaskSlotManager) RecordTask(userID int, username string, data str
 		// 淘汰该用户最旧的槽
 		oldestIdx := m.findOldestUserSlot(userID)
 		if oldestIdx >= 0 {
-			m.reuseSlot(oldestIdx, userID, username, now, hashPrefixes)
+			m.reuseSlot(oldestIdx, userID, username, now, hashPrefixes, maxLevelIdx)
 			return
 		}
 	}
@@ -132,17 +159,18 @@ func (m *ActiveTaskSlotManager) RecordTask(userID int, username string, data str
 		// LRU 淘汰全局最旧的槽
 		if len(m.lruOrder) > 0 {
 			oldestIdx := m.lruOrder[0]
-			m.reuseSlot(oldestIdx, userID, username, now, hashPrefixes)
+			m.reuseSlot(oldestIdx, userID, username, now, hashPrefixes, maxLevelIdx)
 			return
 		}
 	}
 
 	// 3. 分配新槽
 	newSlot := &TaskSlot{
-		UserID:     userID,
-		Username:   username,
-		UpdatedAt:  now,
-		HashPrefix: hashPrefixes,
+		UserID:      userID,
+		Username:    username,
+		UpdatedAt:   now,
+		HashPrefix:  hashPrefixes,
+		MaxLevelIdx: maxLevelIdx,
 	}
 	newIdx := len(m.slots)
 	m.slots = append(m.slots, newSlot)
@@ -151,7 +179,7 @@ func (m *ActiveTaskSlotManager) RecordTask(userID int, username string, data str
 }
 
 // reuseSlot 复用一个槽
-func (m *ActiveTaskSlotManager) reuseSlot(idx int, newUserID int, username string, now int64, hashPrefixes [HashLevelCount][HashPrefixLen]byte) {
+func (m *ActiveTaskSlotManager) reuseSlot(idx int, newUserID int, username string, now int64, hashPrefixes [HashLevelCount][HashPrefixLen]byte, maxLevelIdx int) {
 	oldSlot := m.slots[idx]
 	oldUserID := oldSlot.UserID
 
@@ -166,6 +194,7 @@ func (m *ActiveTaskSlotManager) reuseSlot(idx int, newUserID int, username strin
 	oldSlot.Username = username
 	oldSlot.UpdatedAt = now
 	oldSlot.HashPrefix = hashPrefixes
+	oldSlot.MaxLevelIdx = maxLevelIdx
 
 	m.moveToLRUEnd(idx)
 }
