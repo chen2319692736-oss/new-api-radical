@@ -311,6 +311,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			activeTaskRoute.GET("/rank", controller.GetActiveTaskRankAPI)
 			activeTaskRoute.GET("/stats", controller.GetActiveTaskStatsAPI)
+			activeTaskRoute.GET("/history", controller.GetHighActiveTaskHistoryAPI)
 		}
 	}
 }

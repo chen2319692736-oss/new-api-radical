@@ -327,12 +327,26 @@ func (m *ActiveTaskSlotManager) GetStats() map[string]interface{} {
 // 高活跃任务告警相关常量
 const (
 	// HighActiveTaskScanInterval 扫描间隔（秒）
-	HighActiveTaskScanInterval = 60
+	HighActiveTaskScanInterval = 600 // 10分钟
 	// HighActiveTaskThreshold 告警阈值
-	HighActiveTaskThreshold = 10
+	HighActiveTaskThreshold = 5
 	// HighActiveTaskWindowSeconds 统计窗口（秒）
-	HighActiveTaskWindowSeconds = 300
+	HighActiveTaskWindowSeconds = 600 // 10分钟
 )
+
+// HighActiveTaskRecord 高活跃任务历史记录
+type HighActiveTaskRecord struct {
+	Id          int    `json:"id" gorm:"primaryKey;autoIncrement"`
+	UserId      int    `json:"user_id" gorm:"index"`
+	Username    string `json:"username" gorm:"type:varchar(64)"`
+	ActiveSlots int    `json:"active_slots"`
+	WindowSecs  int    `json:"window_secs"`
+	CreatedAt   int64  `json:"created_at" gorm:"index"`
+}
+
+func (HighActiveTaskRecord) TableName() string {
+	return "high_active_task_records"
+}
 
 // GetHighActiveUsers 获取指定时间窗口内活跃任务数超过阈值的用户
 func (m *ActiveTaskSlotManager) GetHighActiveUsers(windowSeconds int64, threshold int) []UserActiveTaskCount {
@@ -352,13 +366,13 @@ func StartHighActiveTaskScanner() {
 		ticker := time.NewTicker(HighActiveTaskScanInterval * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			scanAndNotifyHighActiveUsers()
+			scanAndSaveHighActiveUsers()
 		}
 	}()
 }
 
-// scanAndNotifyHighActiveUsers 扫描并通知管理员高活跃用户
-func scanAndNotifyHighActiveUsers() {
+// scanAndSaveHighActiveUsers 扫描并保存高活跃用户到数据库
+func scanAndSaveHighActiveUsers() {
 	manager := GetActiveTaskSlotManager()
 	highActiveUsers := manager.GetHighActiveUsers(HighActiveTaskWindowSeconds, HighActiveTaskThreshold)
 	
@@ -366,28 +380,40 @@ func scanAndNotifyHighActiveUsers() {
 		return
 	}
 	
-	// 构建通知内容
-	content := fmt.Sprintf("检测到 %d 个用户在 %d 秒内活跃任务数超过 %d：\n", 
-		len(highActiveUsers), HighActiveTaskWindowSeconds, HighActiveTaskThreshold)
+	now := time.Now().Unix()
 	for _, u := range highActiveUsers {
-		content += fmt.Sprintf("- 用户 %s (ID:%d): %d 个活跃任务\n", u.Username, u.UserID, u.ActiveSlots)
+		record := HighActiveTaskRecord{
+			UserId:      u.UserID,
+			Username:    u.Username,
+			ActiveSlots: u.ActiveSlots,
+			WindowSecs:  HighActiveTaskWindowSeconds,
+			CreatedAt:   now,
+		}
+		DB.Create(&record)
 	}
-	
-	// 获取所有管理员并发送站内信
-	notifyAllAdmins(content)
 }
 
-// notifyAllAdmins 给所有管理员发送站内信
-func notifyAllAdmins(content string) {
-	var admins []User
-	err := DB.Where("role >= ?", 10).Select("id").Find(&admins).Error
-	if err != nil {
-		return
+// GetHighActiveTaskHistory 获取高活跃任务历史记录
+func GetHighActiveTaskHistory(startTime, endTime int64, userId int, limit int) ([]HighActiveTaskRecord, error) {
+	var records []HighActiveTaskRecord
+	query := DB.Model(&HighActiveTaskRecord{})
+	
+	if startTime > 0 {
+		query = query.Where("created_at >= ?", startTime)
+	}
+	if endTime > 0 {
+		query = query.Where("created_at <= ?", endTime)
+	}
+	if userId > 0 {
+		query = query.Where("user_id = ?", userId)
 	}
 	
-	for _, admin := range admins {
-		RecordLog(admin.Id, LogTypeSystem, content)
+	if limit <= 0 {
+		limit = 100
 	}
+	
+	err := query.Order("created_at desc").Limit(limit).Find(&records).Error
+	return records, err
 }
 
 // RecordActiveTaskSlot 记录活跃任务槽（从请求上下文中提取数据）

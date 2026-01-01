@@ -118,7 +118,7 @@ func main() {
 
 	// 启动高活跃任务扫描器
 	model.StartHighActiveTaskScanner()
-	common.SysLog("high active task scanner started")
+	common.SysLog("high active task scanner started (interval: 10min, window: 10min, threshold: 5)")
 
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		gopool.Go(func() {

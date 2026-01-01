@@ -271,6 +271,7 @@ func migrateDB() error {
 		&UserCallHourly{},
 		&Checkin{},
 		&UserFingerprint{},
+		&HighActiveTaskRecord{},
 	)
 	if err != nil {
 		return err
