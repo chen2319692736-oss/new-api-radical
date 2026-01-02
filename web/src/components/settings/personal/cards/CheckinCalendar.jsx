@@ -110,10 +110,10 @@ const CheckinCalendar = ({ t, status }) => {
   };
 
   useEffect(() => {
-    if (status?.checkin_enabled) {
+    if (status?.['checkin_setting.checkin_enabled']) {
       fetchCheckinStatus(currentMonth);
     }
-  }, [status?.checkin_enabled, currentMonth]);
+  }, [status?.['checkin_setting.checkin_enabled'], currentMonth]);
 
   useEffect(() => {
     if (checkinData.stats?.checked_in_today) {
@@ -123,7 +123,7 @@ const CheckinCalendar = ({ t, status }) => {
     }
   }, [checkinData.stats?.checked_in_today]);
 
-  if (!status?.checkin_enabled) {
+  if (!status?.['checkin_setting.checkin_enabled']) {
     return null;
   }
 
