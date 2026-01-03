@@ -138,7 +138,7 @@ const formatContent = (content) => {
   return String(content);
 };
 
-const CodeViewer = ({ content, title, language = 'json' }) => {
+const CodeViewer = ({ content, title, language = 'json', wordWrap = false }) => {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isHoveringCopy, setIsHoveringCopy] = useState(false);
@@ -276,6 +276,7 @@ const CodeViewer = ({ content, title, language = 'json' }) => {
         style={{
           ...codeThemeStyles.content,
           paddingTop: contentPadding,
+          ...(wordWrap ? { whiteSpace: 'pre-wrap', wordBreak: 'break-word' } : {}),
         }}
         className='model-settings-scroll'
       >

@@ -139,7 +139,7 @@ function RecentCallStreamViewer({ stream }) {
           itemKey='agg'
         >
           <div style={{ height: 240 }}>
-            <CodeViewer content={aggregatedText || ''} language='text' />
+            <CodeViewer content={aggregatedText || ''} language='text' wordWrap />
           </div>
         </Collapse.Panel>
 
@@ -148,6 +148,7 @@ function RecentCallStreamViewer({ stream }) {
             <CodeViewer
               content={(chunks || []).join('\n')}
               language='text'
+              wordWrap
             />
           </div>
         </Collapse.Panel>
@@ -245,12 +246,13 @@ function RecentCallDetailDrawer({ open, record, onClose }) {
               >
                 <div className='grid grid-cols-1 lg:grid-cols-2 gap-3'>
                   <div style={{ height: 360 }}>
-                    <CodeViewer content={requestView} language='json' />
+                    <CodeViewer content={requestView} language='json' wordWrap />
                   </div>
                   <div style={{ height: 360 }}>
                     <CodeViewer
                       content={safeString(req?.body)}
                       language={guessLanguageByBodyType(req?.body_type)}
+                      wordWrap
                     />
                   </div>
                 </div>
@@ -284,12 +286,13 @@ function RecentCallDetailDrawer({ open, record, onClose }) {
                 ) : (
                   <div className='grid grid-cols-1 lg:grid-cols-2 gap-3'>
                     <div style={{ height: 360 }}>
-                      <CodeViewer content={upstreamMetaView} language='json' />
+                      <CodeViewer content={upstreamMetaView} language='json' wordWrap />
                     </div>
                     <div style={{ height: 360 }}>
                       <CodeViewer
                         content={safeString(resp?.body)}
                         language={guessLanguageByBodyType(resp?.body_type)}
+                        wordWrap
                       />
                     </div>
                   </div>
@@ -313,7 +316,7 @@ function RecentCallDetailDrawer({ open, record, onClose }) {
                   }
                 >
                   <div style={{ height: 260 }}>
-                    <CodeViewer content={err} language='json' />
+                    <CodeViewer content={err} language='json' wordWrap />
                   </div>
                 </Collapse.Panel>
               )}
