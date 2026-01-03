@@ -107,8 +107,10 @@ func FindUsersByVisitorId(c *gin.Context) {
 		return
 	}
 
+	ip := c.Query("ip") // 可选参数
+
 	pageInfo := common.GetPageQuery(c)
-	users, total, err := model.FindUsersByVisitorId(visitorId, pageInfo)
+	users, total, err := model.FindUsersByVisitorId(visitorId, ip, pageInfo)
 	if err != nil {
 		common.ApiError(c, err)
 		return

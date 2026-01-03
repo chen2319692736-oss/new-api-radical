@@ -90,33 +90,57 @@ type UserWithFingerprint struct {
 	IP           string `json:"ip"`
 }
 
-// FindUsersByVisitorId 查找具有相同visitor id的用户
-func FindUsersByVisitorId(visitorId string, pageInfo *common.PageInfo) ([]UserWithFingerprint, int64, error) {
+// FindUsersByVisitorId 查找具有相同visitor id的用户，可选ip参数进一步过滤
+func FindUsersByVisitorId(visitorId string, ip string, pageInfo *common.PageInfo) ([]UserWithFingerprint, int64, error) {
 	var results []UserWithFingerprint
 	var total int64
 
-	// 先统计总数
-	err := DB.Model(&UserFingerprint{}).
-		Where("visitor_id = ?", visitorId).
-		Select("DISTINCT user_id").
-		Count(&total).Error
+	// 构建基础查询
+	baseWhere := "f.visitor_id = ?"
+	args := []interface{}{visitorId}
+	if ip != "" {
+		baseWhere += " AND f.ip = ?"
+		args = append(args, ip)
+	}
+
+	// 统计不同用户数
+	countQuery := `SELECT COUNT(DISTINCT f.user_id) FROM user_fingerprints f WHERE ` + baseWhere
+	err := DB.Raw(countQuery, args...).Scan(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// 查询用户信息
+	// 查询用户信息，使用子查询确保每个用户只返回一条记录
 	query := `
-		SELECT DISTINCT u.id, u.username, u.display_name, u.email, u.status, u.role, 
+		SELECT u.id, u.username, u.display_name, u.email, u.status, u.role, 
 			   u.quota, u.used_quota, u.request_count,
 			   f.visitor_id, f.created_at as record_time, f.ip
 		FROM user_fingerprints f
 		JOIN users u ON f.user_id = u.id
-		WHERE f.visitor_id = ?
+		WHERE ` + baseWhere + `
+		AND f.id IN (
+			SELECT MAX(f2.id) FROM user_fingerprints f2 
+			WHERE f2.visitor_id = ?` + func() string {
+		if ip != "" {
+			return " AND f2.ip = ?"
+		}
+		return ""
+	}() + ` GROUP BY f2.user_id
+		)
 		ORDER BY f.created_at DESC
 		LIMIT ? OFFSET ?
 	`
 
-	err = DB.Raw(query, visitorId, pageInfo.GetPageSize(), pageInfo.GetStartIdx()).Scan(&results).Error
+	// 构建查询参数
+	queryArgs := make([]interface{}, 0, len(args)*2+2)
+	queryArgs = append(queryArgs, args...)
+	queryArgs = append(queryArgs, visitorId)
+	if ip != "" {
+		queryArgs = append(queryArgs, ip)
+	}
+	queryArgs = append(queryArgs, pageInfo.GetPageSize(), pageInfo.GetStartIdx())
+
+	err = DB.Raw(query, queryArgs...).Scan(&results).Error
 	return results, total, err
 }
 

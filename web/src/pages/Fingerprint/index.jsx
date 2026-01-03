@@ -132,12 +132,14 @@ export default function FingerprintPage() {
   }, []);
 
   // 加载关联用户
-  const loadRelatedUsers = useCallback(async (visitorId) => {
+  const loadRelatedUsers = useCallback(async (visitorId, ip) => {
     setRelatedUsersLoading(true);
     try {
-      const res = await API.get('/api/fingerprint/users', {
-        params: { visitor_id: visitorId, p: 1, page_size: 100 },
-      });
+      const params = { visitor_id: visitorId, p: 1, page_size: 100 };
+      if (ip) {
+        params.ip = ip;
+      }
+      const res = await API.get('/api/fingerprint/users', { params });
       const { success, data, message } = res.data;
       if (success) {
         setRelatedUsers(data?.items || []);
@@ -165,7 +167,7 @@ export default function FingerprintPage() {
     setSelectedVisitorId(visitorId);
     setSelectedIp(ip || '');
     setUsersModalVisible(true);
-    loadRelatedUsers(visitorId);
+    loadRelatedUsers(visitorId, ip);
   };
 
   // 重复指纹表格列
