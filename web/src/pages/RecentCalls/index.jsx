@@ -35,7 +35,7 @@ import {
 import { showError, timestamp2string } from '../../helpers';
 import CodeViewer from '../../components/playground/CodeViewer';
 import SSEViewer from '../../components/playground/SSEViewer';
-import { getRecentCallById, getRecentCalls } from '../../services/recentCalls';
+import { getRecentCalls } from '../../services/recentCalls';
 
 function safeString(v) {
   if (v === undefined || v === null) return '';
@@ -156,35 +156,7 @@ function RecentCallStreamViewer({ stream }) {
   );
 }
 
-function RecentCallDetailDrawer({ open, recordId, onClose }) {
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [record, setRecord] = useState(null);
-
-  const loadDetail = useCallback(async () => {
-    if (!recordId) return;
-    setLoading(true);
-    try {
-      const res = await getRecentCallById(recordId);
-      const data = res?.data?.data;
-      setRecord(data || null);
-    } catch (e) {
-      if (isAxiosError403(e)) {
-        navigate('/forbidden', { replace: true });
-        return;
-      }
-      showError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [recordId, navigate]);
-
-  React.useEffect(() => {
-    if (open) {
-      loadDetail().catch(console.error);
-    }
-  }, [open, loadDetail]);
-
+function RecentCallDetailDrawer({ open, record, onClose }) {
   const req = record?.request || {};
   const resp = record?.response || {};
   const stream = record?.stream || null;
@@ -237,7 +209,6 @@ function RecentCallDetailDrawer({ open, recordId, onClose }) {
     >
       <Card
         className='!rounded-2xl'
-        loading={loading}
         bordered={false}
         bodyStyle={{ padding: 0 }}
       >
@@ -362,7 +333,7 @@ export default function RecentCallsPage() {
   const [limit, setLimit] = useState(100);
   const [beforeId, setBeforeId] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
-  const [activeId, setActiveId] = useState(null);
+  const [activeRecord, setActiveRecord] = useState(null);
 
   const query = useCallback(async () => {
     setLoading(true);
@@ -400,7 +371,7 @@ export default function RecentCallsPage() {
             type='tertiary'
             theme='borderless'
             onClick={() => {
-              setActiveId(r.id);
+              setActiveRecord(r);
               setDetailOpen(true);
             }}
           >
@@ -559,7 +530,7 @@ export default function RecentCallsPage() {
             pagination={false}
             onRow={(record) => ({
               onDoubleClick: () => {
-                setActiveId(record.id);
+                setActiveRecord(record);
                 setDetailOpen(true);
               },
             })}
@@ -572,10 +543,10 @@ export default function RecentCallsPage() {
 
       <RecentCallDetailDrawer
         open={detailOpen}
-        recordId={activeId}
+        record={activeRecord}
         onClose={() => {
           setDetailOpen(false);
-          setActiveId(null);
+          setActiveRecord(null);
         }}
       />
     </div>
