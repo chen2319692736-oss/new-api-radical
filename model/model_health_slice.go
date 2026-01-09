@@ -67,6 +67,20 @@ func (e *ModelHealthEvent) Normalize() error {
 	return nil
 }
 
+// getConflictValueRef returns the appropriate SQL syntax for referencing
+// the new value in an UPSERT conflict clause, depending on the database type.
+// MySQL uses VALUES(column), PostgreSQL uses EXCLUDED.column
+func getConflictValueRef(db *gorm.DB, column string) string {
+	if db != nil && db.Dialector != nil {
+		switch db.Dialector.Name() {
+		case "postgres":
+			return "EXCLUDED." + column
+		}
+	}
+	// MySQL and SQLite use VALUES()
+	return "VALUES(" + column + ")"
+}
+
 func UpsertModelHealthSlice5m(ctx context.Context, db *gorm.DB, event *ModelHealthEvent) error {
 	if event == nil {
 		return errors.New("event is nil")
@@ -99,14 +113,23 @@ func UpsertModelHealthSlice5m(ctx context.Context, db *gorm.DB, event *ModelHeal
 		row.SuccessQualifiedRequests = 1
 	}
 
+	// Use database-specific syntax for conflict value references
+	totalReqRef := getConflictValueRef(db, "total_requests")
+	errorReqRef := getConflictValueRef(db, "error_requests")
+	successQualRef := getConflictValueRef(db, "success_qualified_requests")
+	hasSuccessRef := getConflictValueRef(db, "has_success_qualified")
+	maxRespBytesRef := getConflictValueRef(db, "max_response_bytes")
+	maxCompTokensRef := getConflictValueRef(db, "max_completion_tokens")
+	maxAssistCharsRef := getConflictValueRef(db, "max_assistant_chars")
+
 	updates := map[string]any{
-		"total_requests": gorm.Expr("total_requests + VALUES(total_requests)"),
-		"error_requests": gorm.Expr("error_requests + VALUES(error_requests)"),
-		"success_qualified_requests": gorm.Expr("success_qualified_requests + VALUES(success_qualified_requests)"),
-		"has_success_qualified":      gorm.Expr("has_success_qualified OR VALUES(has_success_qualified)"),
-		"max_response_bytes":         gorm.Expr("GREATEST(max_response_bytes, VALUES(max_response_bytes))"),
-		"max_completion_tokens":      gorm.Expr("GREATEST(max_completion_tokens, VALUES(max_completion_tokens))"),
-		"max_assistant_chars":        gorm.Expr("GREATEST(max_assistant_chars, VALUES(max_assistant_chars))"),
+		"total_requests":             gorm.Expr("total_requests + " + totalReqRef),
+		"error_requests":             gorm.Expr("error_requests + " + errorReqRef),
+		"success_qualified_requests": gorm.Expr("success_qualified_requests + " + successQualRef),
+		"has_success_qualified":      gorm.Expr("has_success_qualified OR " + hasSuccessRef),
+		"max_response_bytes":         gorm.Expr("GREATEST(max_response_bytes, " + maxRespBytesRef + ")"),
+		"max_completion_tokens":      gorm.Expr("GREATEST(max_completion_tokens, " + maxCompTokensRef + ")"),
+		"max_assistant_chars":        gorm.Expr("GREATEST(max_assistant_chars, " + maxAssistCharsRef + ")"),
 	}
 
 	return db.WithContext(ctx).Clauses(clause.OnConflict{
